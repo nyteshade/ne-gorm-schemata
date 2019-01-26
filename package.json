@@ -27,6 +27,7 @@
     "debug": "^4.1.1",
     "graphql": "^14.1.1",
     "gremlin-orm": "^1.1.9",
+    "lodash": "^4.17.11",
     "ne-schemata": "^1.11.3"
   }
 }
