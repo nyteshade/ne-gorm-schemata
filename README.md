@@ -1,4 +1,4 @@
-# ne-gql-gorm-schemas
+# ne-gorm-schemata
 This is a bi-directional NodeJS Gremlin ORM Schema to GraphQL Schema converter
 
 ## Plans
