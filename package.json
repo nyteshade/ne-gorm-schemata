@@ -1,0 +1,32 @@
+{
+  "name": "ne-gorm-schemata",
+  "version": "0.0.0",
+  "description": "This is a bi-directional NodeJS Gremlin ORM Schema to GraphQL Schema converter",
+  "main": "dist",
+  "scripts": {
+    "test": "jest"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/nyteshade/ne-gorm-schemata.git"
+  },
+  "keywords": [
+    "gremlin-orm",
+    "ne-schemata",
+    "graphql",
+    "graphdb",
+    "janusgraph"
+  ],
+  "author": "Brielle Harrison <nyteshade@gmail.com>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/nyteshade/ne-gorm-schemata/issues"
+  },
+  "homepage": "https://github.com/nyteshade/ne-gorm-schemata#readme",
+  "dependencies": {
+    "debug": "^4.1.1",
+    "graphql": "^14.1.1",
+    "gremlin-orm": "^1.1.9",
+    "ne-schemata": "^1.11.3"
+  }
+}
