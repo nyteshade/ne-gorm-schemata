@@ -20,7 +20,7 @@ const Person = g.define('person', {
 ```
 
 to something like
-```
+```js
 const gremlinOrm = require('gremlin-orm');
 const g = new gremlinOrm('janusgraph'); // connects to localhost:8182 by default
 const { gql } = require('ne-gorm-schemata');
