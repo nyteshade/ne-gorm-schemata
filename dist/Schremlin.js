@@ -3,7 +3,7 @@
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
-exports.Schremlin = exports.GORM_TYPES = exports.ORM_OPTS = exports.ORM = void 0;
+exports.Schremlin = exports.GORM_TYPES = exports.REMOTE_TYPES = exports.ORM_SCHEMA = exports.ORM_OPTS = exports.ORM = void 0;
 
 var _neSchemata = require("ne-schemata");
 
@@ -35,6 +35,10 @@ var ORM = Symbol('Gremlin-ORM Instance');
 exports.ORM = ORM;
 var ORM_OPTS = Symbol('Gremlin-ORM Instance Creation Options');
 exports.ORM_OPTS = ORM_OPTS;
+var ORM_SCHEMA = Symbol('Gremlin-ORM Compatible Schema');
+exports.ORM_SCHEMA = ORM_SCHEMA;
+var REMOTE_TYPES = Symbol('Gremlin Defined Schema Types');
+exports.REMOTE_TYPES = REMOTE_TYPES;
 var GORM_TYPES = {
   String: function String(orm) {
     return orm.STRING;
@@ -89,11 +93,13 @@ function (_Schemata) {
 
     _classCallCheck(this, Schremlin);
 
-    _this = new _neSchemata.Schemata(typeDefs, resolvers);
+    _this = _possibleConstructorReturn(this, _getPrototypeOf(Schremlin).call(this, typeDefs, resolvers));
     _this[ORM_OPTS] = gormOpts;
     _this[ORM] = _this.createOrmInstance();
+    _this[REMOTE_TYPES] = {};
+    _this[ORM_SCHEMA] = _this.buildORMSchema();
 
-    _this.buildORMSchema();
+    _this.defineRemoteSchemas();
 
     return _this;
   }
@@ -124,13 +130,6 @@ function (_Schemata) {
         return 'GremlinOrmOptions';
       }, _defineEnumerableProperties(_Object$assign, _mutatorMap), _Object$assign));
     }
-    /**
-     * Retrieves the instance's `gremlin-orm` Gorm instance
-     *
-     * @return {Gorm} the internal instance of Gorm, exported by the
-     * `gremlin-orm` library.
-     */
-
   }, {
     key: "buildORMSchema",
 
@@ -144,8 +143,10 @@ function (_Schemata) {
      */
     value: function buildORMSchema(typeMap) {
       var orm = this.orm;
+      var types = typeMap || this.types;
+      var fields = {};
 
-      var _arr = Object.keys(typeMap);
+      var _arr = Object.keys(types);
 
       for (var _i = 0; _i < _arr.length; _i++) {
         var type = _arr[_i];
@@ -155,18 +156,23 @@ function (_Schemata) {
         }
 
         try {
-          var fields = {};
-
-          var _arr2 = Object.keys(typeMap[type]);
+          var _arr2 = Object.keys(types[type]);
 
           for (var _i2 = 0; _i2 < _arr2.length; _i2++) {
             var field = _arr2[_i2];
+            var sdlType = types[type][field].type;
+            var gormKey = /(\w+)/.exec(sdlType);
 
-            var _type = GORM_TYPES[/w+/.exec(typeMap[_type][field].type)[0]](orm);
+            if (!gormKey) {
+              continue;
+            } else {
+              gormKey = gormKey[1];
+            }
 
-            var required = /\!/.test(typeMap[_type][field].type);
-            fields[_type] = {
-              type: _type,
+            var gormType = GORM_TYPES[gormKey](orm);
+            var required = /\!/.test(sdlType);
+            (fields[type] = fields[type] || {})[field] = {
+              type: gormType,
               required: required
             };
           }
@@ -182,7 +188,59 @@ function (_Schemata) {
           continue;
         }
       }
+
+      return fields;
     }
+  }, {
+    key: "defineRemoteSchemas",
+    value: function defineRemoteSchemas(gremlinSchema) {
+      var ormSchema = gremlinSchema || this.ormSchema;
+
+      var _arr3 = Object.keys(ormSchema);
+
+      for (var _i3 = 0; _i3 < _arr3.length; _i3++) {
+        var schema = _arr3[_i3];
+        console.log("Defining schema for ".concat(schema));
+        this.remoteTypes[schema] = this.orm.define(schema, ormSchema[schema]);
+      }
+    }
+  }, {
+    key: "reconnect",
+    value: function reconnect() {
+      var retries = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : 3;
+
+      if (this.orm.client.connected) {
+        return true;
+      }
+
+      for (var i = 0; i < retries; i++) {
+        this.orm = this.createOrmInstance();
+
+        if (this.connected) {
+          this.defineRemoteSchemas();
+          return true;
+        }
+      }
+
+      if (!this.connected) {
+        return false;
+      }
+    }
+  }, {
+    key: "remoteTypes",
+    get: function get() {
+      return this[REMOTE_TYPES];
+    },
+    set: function set(value) {
+      this[REMOTE_TYPES] = value;
+    }
+    /**
+     * Retrieves the instance's `gremlin-orm` Gorm instance
+     *
+     * @return {Gorm} the internal instance of Gorm, exported by the
+     * `gremlin-orm` library.
+     */
+
   }, {
     key: "orm",
     get: function get() {
@@ -198,6 +256,26 @@ function (_Schemata) {
     ,
     set: function set(value) {
       this[ORM] = value;
+    }
+    /**
+     * Retrieves the calculated schema that is usable by gremlin-orm in general.
+     * 
+     * @return {Object} the calculated gremlin-orm compatible schema def
+     */
+
+  }, {
+    key: "ormSchema",
+    get: function get() {
+      return this[ORM_SCHEMA];
+    },
+    set: function set(value) {
+      this[ORM_SCHEMA] = value;
+    }
+  }, {
+    key: "connected",
+    get: function get() {
+      console.log('Connected? ' + this.orm.client.connected);
+      return this.orm.client.connected;
     }
   }]);
 

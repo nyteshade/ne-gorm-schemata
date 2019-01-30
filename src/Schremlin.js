@@ -7,6 +7,8 @@ import type { SchemaSource, ResolverMap } from 'ne-schemata'
 
 export const ORM = Symbol('Gremlin-ORM Instance')
 export const ORM_OPTS = Symbol('Gremlin-ORM Instance Creation Options')
+export const ORM_SCHEMA = Symbol('Gremlin-ORM Compatible Schema')
+export const REMOTE_TYPES = Symbol('Gremlin Defined Schema Types')
 
 export const GORM_TYPES = {
   String(orm) { return orm.STRING },
@@ -51,8 +53,10 @@ export class Schremlin extends Schemata {
 
     this[ORM_OPTS] = gormOpts
     this[ORM] = this.createOrmInstance()
+    this[REMOTE_TYPES] = {}
+    this[ORM_SCHEMA] = this.buildORMSchema()
 
-    this.buildORMSchema()
+    this.defineRemoteSchemas()
   }
 
   /**
@@ -71,6 +75,14 @@ export class Schremlin extends Schemata {
     return Object.assign(new GOrm(dialect, port, url, options), {
       get [Symbol.toStringTag]() { return 'GremlinOrmOptions' }
     })
+  }
+
+  get remoteTypes(): Object {
+    return this[REMOTE_TYPES]
+  }
+
+  set remoteTypes(value: Object) {
+    this[REMOTE_TYPES] = value
   }
 
   /**
@@ -95,6 +107,19 @@ export class Schremlin extends Schemata {
   }
 
   /**
+   * Retrieves the calculated schema that is usable by gremlin-orm in general.
+   * 
+   * @return {Object} the calculated gremlin-orm compatible schema def
+   */
+  get ormSchema(): Object {
+    return this[ORM_SCHEMA]
+  }
+
+  set ormSchema(value: Object) {
+    this[ORM_SCHEMA] = value
+  }
+
+  /**
    * This method walks a `Schemata.types` object and invokes typical Gremlin
    * style schema creation (ala JanusGraph). The keys are the names of types
    * and fields and the values are GraphQL SDL type values.
@@ -104,18 +129,31 @@ export class Schremlin extends Schemata {
    */
   buildORMSchema(typeMap: Object) {
     let orm = this.orm
+    let types = typeMap || this.types 
+    let fields = {}
 
-    for (let type of Object.keys(typeMap)) {
+    for (let type of Object.keys(types)) {
       if (/Query|Mutation|Subscription/.test(type)) { continue }
 
       try {
-        let fields = {}
+        for (let field of Object.keys(types[type])) {
+          let sdlType = types[type][field].type
+          let gormKey = /(\w+)/.exec(sdlType)
 
-        for (let field of Object.keys(typeMap[type])) {
-          let type = GORM_TYPES[/w+/.exec(typeMap[type][field].type)[0]](orm)
-          let required = /\!/.test(typeMap[type][field].type)
+          if (!gormKey) { 
+            continue 
+          }
+          else {
+            gormKey = gormKey[1]
+          }
 
-          fields[type] = { type, required }
+          let gormType = GORM_TYPES[gormKey](orm)
+          let required = /\!/.test(sdlType);
+
+          (fields[type] = (fields[type] || {}))[field] = { 
+            type: gormType, 
+            required 
+          }
         }
 
         if (Object.keys(fields).length) {
@@ -131,5 +169,36 @@ export class Schremlin extends Schemata {
         continue
       }
     }
+
+    return fields
+  }
+
+  defineRemoteSchemas(gremlinSchema: Object) {
+    let ormSchema = gremlinSchema || this.ormSchema
+
+    for (let schema of Object.keys(ormSchema)) {
+      console.log(`Defining schema for ${schema}`)
+      this.remoteTypes[schema] = this.orm.define(schema, ormSchema[schema])
+    }
+  }
+
+  get connected() {
+    console.log('Connected? ' + this.orm.client.connected)
+    return this.orm.client.connected
+  }
+
+  reconnect(retries = 3) {
+    if (this.orm.client.connected) {
+      return true
+    }
+    for (let i = 0; i < retries; i++) {
+      this.orm = this.createOrmInstance()
+      if (this.connected) {
+        this.defineRemoteSchemas()
+        return true 
+      }
+    }
+
+    if (!this.connected) { return false }
   }
 }
